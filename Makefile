@@ -1,6 +1,8 @@
 SOURCES := main.c
 OBJS = $(SOURCES:.c=.o)
 EXES = $(SOURCES:.c=.exe)
+# lib for win sound api
+LIBS = -lwinmm
 
 RESOURCE_COMPILER_UTILITY = windres
 RESOURCE_COMPILER_FLAGS = -O coff
@@ -11,7 +13,7 @@ RESOURCE_LINK_FILE =
 build : res $(EXES)
 
 %.exe : %.o 
-	gcc $^ $(RESOURCE_OUTPUT_FILE) -lwinmm -o $@
+	gcc $^ $(RESOURCE_OUTPUT_FILE) $(LIBS) -o $@
 
 %.o : %.c
 	gcc -g -c $^ -o $@
