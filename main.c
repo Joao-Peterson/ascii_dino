@@ -7,24 +7,6 @@
 #include "ascii_screen.h"
 #include "win_res.h"
 
-// char *get_win_error(){
-//     DWORD error_code = GetLastError();
-
-//     char *error_msg = malloc(sizeof(*error_msg)*200);
-    
-//     FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, // format as error from system
-//                     NULL, // aditional parameter
-//                     error_code, // DWORD error code
-//                     MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT), // language to format string
-//                     (LPSTR)error_msg, // string, cast before passing
-//                     200, // size
-//                     NULL // aditional parameters
-//                     );
-
-//     return error_msg;
-// }
-
-
 int main(void) {
 
     float time_ratio = 1.0;
@@ -49,13 +31,13 @@ int main(void) {
         free(rex_sprites_string[i]);
     free(rex_sprites_string);
 
-    // rex_sprite[0]->Array_recolour(rex_sprite, ASCII_ANCHOR_TOP_LEFT, 0, 3, 7, 2, ASCII_LAYER_BACKGROUND | ASCII_LAYER_FOREGROUND, ASCII_COLOR_BACKGROUND_RED);
-    rex_sprite[0]->Recolour(rex_sprite[1], ASCII_ANCHOR_TOP_LEFT, 0, 0, rex_sprite[1]->width, rex_sprite[1]->height, ASCII_LAYER_FOREGROUND, sky | ASCII_COLOR_FOREGROUND_GREEN);
-    rex_sprite[0]->Recolour(rex_sprite[2], ASCII_ANCHOR_TOP_LEFT, 0, 0, rex_sprite[1]->width, rex_sprite[1]->height, ASCII_LAYER_FOREGROUND, sky | ASCII_COLOR_FOREGROUND_RED);
-
+    
     ascii_screen *console = ascii_screen_new(77, 17);
 
-
+    // PlaySoundA(TEXT("Jump.wav"), NULL, SND_FILENAME);
+    PlaySoundA(TEXT("jump"), GetModuleHandle(NULL), SND_RESOURCE);
+    PlaySoundA(TEXT("coin"), GetModuleHandle(NULL), SND_RESOURCE);
+    
     while(1)
     {
         time = time_elapsed * time_ratio;
@@ -66,6 +48,7 @@ int main(void) {
         if(time_counter > 250.0){
             if(sprite_select == 1){
                 sprite_select = 2;
+                PlaySoundA(TEXT("power"), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC );
             }
             else{
                 sprite_select = 1;

@@ -11,7 +11,7 @@ RESOURCE_LINK_FILE =
 build : res $(EXES)
 
 %.exe : %.o 
-	gcc $^ $(RESOURCE_OUTPUT_FILE) -o $@
+	gcc $^ $(RESOURCE_OUTPUT_FILE) -lwinmm -o $@
 
 %.o : %.c
 	gcc -g -c $^ -o $@

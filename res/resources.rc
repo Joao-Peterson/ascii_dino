@@ -13,3 +13,7 @@ cacti_0 RCDATA "../sprites/cacti_0.txt"
 cacti_1 RCDATA "../sprites/cacti_1.txt"
 cacti_2 RCDATA "../sprites/cacti_2.txt"
 cacti_3 RCDATA "../sprites/cacti_3.txt"
+
+jump WAVE "../sounds/Jump.wav"
+coin WAVE "../sounds/Pickup_Coin.wav"
+power WAVE "../sounds/Powerup.wav"
