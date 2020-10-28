@@ -4,6 +4,10 @@
 
 myicon ICON "icon.ico"
 
+logo0   RCDATA "../sprites/logo.txt"
+
+ground0 RCDATA "../sprites/ground0.txt"
+
 cacti0  RCDATA "../sprites/cacti0.txt"
 cacti1  RCDATA "../sprites/cacti1.txt"
 cacti2  RCDATA "../sprites/cacti2.txt"

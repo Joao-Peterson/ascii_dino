@@ -9,6 +9,8 @@ typedef struct ascii_screen ascii_screen;
 
 typedef struct ascii_sprite ascii_sprite;
 
+typedef struct ascii_canvas ascii_canvas;
+
 /* ------------------ */
 
 typedef enum{
@@ -159,6 +161,8 @@ void ascii_screen_display_buffer(ascii_screen* screen);
 
 void ascii_screen_draw_sprite(ascii_screen *screen, ASCII_ANCHOR_Typedef anchor, unsigned int x, unsigned int y, ascii_sprite *sprite);
 
+void ascii_screen_draw_canvas(ascii_screen *screen, ASCII_ANCHOR_Typedef anchor, unsigned int x, unsigned int y, unsigned int width, unsigned int height, ascii_canvas *canvas);
+
 void ascii_screen_fill_screen(ascii_screen *screen, char character, ASCII_COLOR_Typedef color);
 
 void ascii_screen_draw_line(ascii_screen *screen, unsigned int x1, unsigned int y1, unsigned int x2, unsigned int y2, char character, ASCII_COLOR_Typedef color);
@@ -184,12 +188,17 @@ void ascii_sprite_array_substitute_char(ascii_sprite **sprite_array, ASCII_ANCHO
 
 void ascii_sprite_array_delete(ascii_sprite **sprite_array);
 
+
+ascii_canvas *ascii_canvas_new(unsigned int width, unsigned int height, char *drawing, bool no_background, ASCII_COLOR_Typedef background_color, ASCII_COLOR_Typedef foreground_color);
+
+void ascii_canvas_shift(ascii_canvas *canvas, int x, int y);
+
 /* ------------------ */
 
 struct ascii_screen{
-    int width;
-    int height;
-    int size;
+    unsigned int width;
+    unsigned int height;
+    unsigned int size;
     CHAR_INFO *stream;
     CHAR_INFO **buffer;
     HANDLE hscreenbuffer;
@@ -197,6 +206,7 @@ struct ascii_screen{
     void (*Display_buffer)  (ascii_screen* screen);
     void (*Delete)          (ascii_screen *screen);
     void (*Draw_sprite)     (ascii_screen *screen, ASCII_ANCHOR_Typedef anchor, unsigned int x, unsigned int y, ascii_sprite *sprite);
+    void (*Draw_canvas)     (ascii_screen *screen, ASCII_ANCHOR_Typedef anchor, unsigned int x, unsigned int y, unsigned int width, unsigned int height, ascii_canvas *canvas);
     void (*Fill_screen)     (ascii_screen *screen, char character, ASCII_COLOR_Typedef color);
     void (*Draw_line)       (ascii_screen *screen, unsigned int x1, unsigned int y1, unsigned int x2, unsigned int y2, char character, ASCII_COLOR_Typedef color);
     void (*Draw_box)        (ascii_screen *screen, unsigned int x1, unsigned int y1, unsigned int x2, unsigned int y2, ASCII_LAYER_Typedef layers, char border_character, ASCII_COLOR_Typedef border_color, char fill_character, ASCII_COLOR_Typedef fill_color);
@@ -206,9 +216,9 @@ struct ascii_screen{
 } ;
 
 struct ascii_sprite{
-    int width;
-    int height;
-    int sprite_qty;
+    unsigned int width;
+    unsigned int height;
+    unsigned int sprite_qty;
     WORD background_color;
     bool no_background;
     WORD font_color;
@@ -219,6 +229,17 @@ struct ascii_sprite{
     void (*Substitute_char)         (ascii_sprite *sprite, ASCII_ANCHOR_Typedef anchor, unsigned int x, unsigned int y, unsigned int width, unsigned int height, char **char_matrix);
     void (*Array_substitute_char)   (ascii_sprite **sprite_array, ASCII_ANCHOR_Typedef anchor, unsigned int x, unsigned int y, unsigned int width, unsigned int height, char **char_matrix);
     void (*Delete_array)            (ascii_sprite **sprite_array);
+};
+
+struct ascii_canvas{
+    unsigned int width;
+    unsigned int height;
+    WORD background_color;
+    bool no_background;
+    WORD font_color;
+    CHAR_INFO **canvas;
+
+    void (*Shift)           (ascii_canvas *canvas, int x, int y);
 };
 
 /* ------------------ */
@@ -260,6 +281,7 @@ ascii_screen *ascii_screen_new(unsigned int width, unsigned int height){
     scr->Delete = ascii_screen_delete;
     scr->Display_buffer = ascii_screen_display_buffer;
     scr->Draw_sprite = ascii_screen_draw_sprite;
+    scr->Draw_canvas = ascii_screen_draw_canvas;
     scr->Draw_line = ascii_screen_draw_line;
     scr->Draw_box = ascii_screen_draw_box;
     scr->Draw_frame = ascii_screen_draw_frame;
@@ -317,6 +339,45 @@ void ascii_screen_draw_sprite(ascii_screen *screen, ASCII_ANCHOR_Typedef anchor,
             if(((i + delta_y) >= 0 && (i + delta_y) < screen->height) && ((j + delta_x) >= 0 && (j + delta_x) < screen->width)) // inside the screen
                 if(sprite->sprite[i][j].Char.AsciiChar != ' ' || sprite->no_background == 0) // when ' ', space, dont print, except when no_background is 0, then print
                     screen->buffer[i + delta_y][j + delta_x] = sprite->sprite[i][j];
+
+        }
+    }    
+}
+
+void ascii_screen_draw_canvas(ascii_screen *screen, ASCII_ANCHOR_Typedef anchor, unsigned int x, unsigned int y, unsigned int width, unsigned int height, ascii_canvas *canvas){ 
+
+    int delta_x, delta_y;
+
+    switch(anchor){
+        case ASCII_ANCHOR_TOP_LEFT:
+            delta_x = x;
+            delta_y = y;
+            break;
+            
+        case ASCII_ANCHOR_TOP_RIGHT:
+            delta_x = (x - canvas->width);
+            delta_y = y;
+            break;
+            
+        case ASCII_ANCHOR_BOTTOM_LEFT:
+            delta_x = x;
+            delta_y = (y - canvas->height);
+            break;
+            
+        case ASCII_ANCHOR_BOTTOM_RIGHT:
+            delta_x = (x - canvas->width);
+            delta_y = (y - canvas->height);
+            break;
+    }
+
+
+    for(int i = 0; i < canvas->height; i++){
+        for(int j = 0; j < canvas->width; j++){
+            
+            if(((i + delta_y) >= 0 && (i + delta_y) < screen->height) && ((j + delta_x) >= 0 && (j + delta_x) < screen->width)) // inside the screen
+                if( ( (i + delta_y) < (delta_y + height)) && ((j + delta_x) < (delta_x + width) ) ) // width and height specified
+                    if(canvas->canvas[i][j].Char.AsciiChar != ' ' || canvas->no_background == 0) // when ' ', space, dont print, except when no_background is 0, then print
+                        screen->buffer[i + delta_y][j + delta_x] = canvas->canvas[i][j];
 
         }
     }    
@@ -422,8 +483,6 @@ void ascii_screen_fill_screen(ascii_screen *screen, char character, ASCII_COLOR_
 void ascii_screen_clear(ascii_screen *screen){
     ascii_screen_fill_screen(screen, ' ', 0);
 }
-
-
 
 
 ascii_sprite **ascii_sprite_array_new(unsigned int width, unsigned int height, unsigned int files_qty, char **array, bool no_background, ASCII_COLOR_Typedef background_color, ASCII_COLOR_Typedef font_color){
@@ -611,3 +670,98 @@ void ascii_sprite_array_delete(ascii_sprite **sprite_array){
     free(sprite_array);
 }
 
+
+ascii_canvas *ascii_canvas_new(unsigned int width, unsigned int height, char *drawing, bool no_background, ASCII_COLOR_Typedef background_color, ASCII_COLOR_Typedef foreground_color){
+    ascii_canvas *canvas = (ascii_canvas*)malloc(sizeof(ascii_canvas));
+
+    *canvas = (ascii_canvas){
+        .width = width,
+        .height = height,
+        .no_background = no_background,
+        .background_color = background_color,
+        .font_color = foreground_color
+    };
+
+    canvas->canvas = (CHAR_INFO**)calloc(height, sizeof(CHAR_INFO*));
+
+    for(int j = 0; j < height; j ++){ // for each line
+    
+        canvas->canvas[j] = (CHAR_INFO*)calloc(width, sizeof(CHAR_INFO));
+
+        int is_inline = 1;
+        int is_insprite = 1;
+
+        for(int k = 0; k < width; k++){ // for each column
+            if( !is_insprite ){
+                canvas->canvas[j][k].Char.AsciiChar = ' ';
+                canvas->canvas[j][k].Attributes = (WORD) background_color;
+            }
+            else if( (drawing[k] != '\n' && drawing[k] != '\0') && is_inline){ // reads until a '\n' or '\0' occur, in this case fill with ' ' spaces;
+                canvas->canvas[j][k].Char.AsciiChar = drawing[k];
+                canvas->canvas[j][k].Attributes = (WORD) foreground_color;
+            }
+            else if( drawing[k] == '\0' ){
+                canvas->canvas[j][k].Char.AsciiChar = ' ';
+                canvas->canvas[j][k].Attributes = (WORD) background_color;
+                is_inline = 0;
+                is_insprite = 0;
+            }
+            else{
+                canvas->canvas[j][k].Char.AsciiChar = ' ';
+                canvas->canvas[j][k].Attributes = (WORD) background_color;
+                is_inline = 0;
+            }
+        }
+
+        if (is_insprite){ // dont run pointer if sprite ended
+            int k = 0;
+
+            while(drawing[k] != '\n' && drawing[k] != '\0'){ // gets a pointer to next line
+                drawing++;
+            }
+            
+            drawing++; // point to next line
+        }
+    }
+
+    canvas->Shift = ascii_canvas_shift;
+
+    return canvas;
+}
+
+void ascii_canvas_shift(ascii_canvas *canvas, int x, int y){
+    CHAR_INFO array_x[canvas->width];
+    CHAR_INFO array_y[canvas->height];
+
+    for(int k = 0; k < ((x < 0) ? -x : x); k++){
+        for(int i = 0; i < canvas->height; i++) // Grab end array
+            array_y[i] = canvas->canvas[i][(x < 0) ? (canvas->width - 1) : 0];
+
+        for(int i = ((x < 0) ? (canvas->width - 1) : 0); ( (x < 0) ? (i > 0) : (i < (canvas->width - 1)) ); i += ((x < 0) ? (-1) : (1)) ){ // shift the matrix
+            for(int j = 0; j < canvas->height; j++){
+                canvas->canvas[j][i] = canvas->canvas[j][i + ((x < 0) ? -1 : 1)]; 
+            }
+        }
+
+        for(int j = 0; j < canvas->height; j++){    // re allocate the first array
+            canvas->canvas[j][((x < 0) ? 0 : canvas->width - 1)] = array_y[j]; 
+        }
+    }
+
+    for(int k = 0; k < ((y < 0) ? -y : y); k++){
+        for(int i = 0; i < canvas->width; i++)  // Grab end array
+            array_x[i] = canvas->canvas[(y < 0) ? 0 : (canvas->height - 1)][i];
+
+        for(int i = ((y < 0) ? 0 : (canvas->height - 1)); ( (y < 0) ? (i < (canvas->height - 1)) : (i > 0) ); i += ((y < 0) ? 1 : -1) ){ // shift the matrix
+            for(int j = 0; j < canvas->width; j++){
+                canvas->canvas[i][j] = canvas->canvas[i + ((y < 0) ? 1 : -1)][j]; 
+            }
+        }
+
+        for(int j = 0; j < canvas->width; j++){    // re allocate the first array
+            canvas->canvas[((y < 0) ? (canvas->height - 1) : 0 )][j] = array_x[j]; 
+        }
+    }
+}
+
+// ASCII CANVAS DELETE
