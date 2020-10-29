@@ -4,6 +4,7 @@
 #include <conio.h>
 #include <Windows.h>
 #include <time.h>
+#include <math.h>
 
 #include "ascii_screen.h"
 #include "win_res.h"
@@ -39,7 +40,7 @@ typedef enum{
 
 const COLOR_PALETTE palette_normal = {
     .sky_color =          ASCII_COLOR_BACKGROUND_BLUE | ASCII_COLOR_BACKGROUND_INTENSITY,
-    .menu_color =         ASCII_COLOR_BACKGROUND_BLUE | ASCII_COLOR_FOREGROUND_WHITE,
+    .menu_color =         ASCII_COLOR_BACKGROUND_BLUE | ASCII_COLOR_FOREGROUND_BLACK,
     .ground_back_color =  ASCII_COLOR_BACKGROUND_YELLOW,
     .ground_fore_color =  ASCII_COLOR_FOREGROUND_YELLOW | ASCII_COLOR_FOREGROUND_INTENSITY,
     .border_color =       ASCII_COLOR_BACKGROUND_BLUE | ASCII_COLOR_BACKGROUND_INTENSITY | ASCII_COLOR_FOREGROUND_BLACK,
@@ -68,12 +69,18 @@ ascii_sprite **sprites_load(const char *name, unsigned int quantity, unsigned in
 
 void play_sound(SOUND_Typedef sound);
 
+void play_sound_async(SOUND_Typedef sound);
+
+int jump_function(float t2, int h, float t);
+
+int random_range(int a, int b);
+
 /* ------------------------- Main -------------------------------------------------- */
 
 int main(void) {
 
     float time_ratio = 1.0;
-    float time;
+    float timer;
     clock_t time_stamp;
     clock_t time_elapsed;
 
@@ -86,7 +93,27 @@ int main(void) {
     float clouds_move_timer = 0.0;
     bool clouds_move = 0;
 
+    float score_timer = 0.0;
+    unsigned long score = 0; // 10 decimal places
+    unsigned long score_last = 0; 
+    const unsigned long score_gain = 100; 
+    const int score_sound_limit = 10000;
+    const char* score_msg = "Score:"; 
+    char *score_buffer = (char*)malloc(strlen(score_msg)+10+1); 
+
+    float jump_timer = 0.0;
     bool jump_flag = 0;
+    bool in_air_flag = 0;
+
+    const float t2_max = 2000.0;
+    const float t2_min = 1250.0;
+    const float t2_gain = 50.0;
+    float t2 = 0.0;
+    int max_height = 8;
+    int pos_y = 0;
+
+    const float cacti_delay = 2000.0;
+
     
     int sprite_select = 0;
     unsigned int current_screen = 0;
@@ -109,25 +136,31 @@ int main(void) {
     ascii_canvas *clouds = ascii_canvas_new(150,10,clouds_ascii, true, palette->sky_color, palette->cloud_color);
     free(clouds_ascii);
 
-    play_sound(SOUND_COIN0);
+    srand(time(NULL));
+
+    play_sound_async(SOUND_COIN0);
 
     /* ------------------------- Main Loop --------------------------------------------- */
 
     while(1)
     {
         // TIMING ...
-        time = time_elapsed * time_ratio;
-        text_blinker_timer += time;
-        ground_move_timer += time;
-        walk_move_timer += time;
-        clouds_move_timer += time;
+        timer = time_elapsed * time_ratio;
+        text_blinker_timer += timer;
+        ground_move_timer += timer;
+        walk_move_timer += timer;
+        clouds_move_timer += timer;
+
+        if(current_screen == 1){ score_timer += timer; }
+        if(in_air_flag){ jump_timer += timer; }
+        
         time_stamp = clock();
 
-        if(text_blinker_timer > 400.0){ text_blinker_timer = 0.0; text_blinker ^= 1; }
-        if(ground_move_timer  > 100.0){ ground_move_timer  = 0.0; ground_move = 1  ; }
-        if(walk_move_timer    > 200.0){ walk_move_timer    = 0.0; walk_move = 1    ; }
-        if(clouds_move_timer  > 500.0){ clouds_move_timer  = 0.0; clouds_move = 1  ; }
-
+        if(text_blinker_timer   > 400.0)    { text_blinker_timer = 0.0; text_blinker ^= 1   ; }
+        if(ground_move_timer    > 50.0)     { ground_move_timer  = 0.0; ground_move = 1     ; }
+        if(walk_move_timer      > 100.0)    { walk_move_timer    = 0.0; walk_move = 1       ; }
+        if(clouds_move_timer    > 800.0)    { clouds_move_timer  = 0.0; clouds_move = 1     ; }
+        if(score_timer          > 100.0)    { score_timer        = 0.0; score += score_gain ; if(score >= (score_last + score_sound_limit)){ play_sound_async(random_range(SOUND_COIN0, SOUND_POWER2)); score_last = score; } }
 
         //INPUT DETECTION
         if(kbhit())
@@ -139,10 +172,24 @@ int main(void) {
 
         switch(keyboard_input){
             case ' ':
-                if(current_screen == 0)
-                    current_screen = 1;
-                else if(current_screen == 1)
-                    jump_flag = 1;
+                switch(current_screen){
+                    case 0:
+                        current_screen = 1;
+                        break;
+
+                    case 1:
+                        switch(in_air_flag){
+                            case 0:
+                                jump_flag = 1;
+                                break;
+
+                            case 1:
+                                if(t2 >= 0.0 && t2 < t2_max) 
+                                    t2 += t2_gain;
+                                break;
+                        }
+                        break;
+                }
                 break;
 
             default:
@@ -164,10 +211,39 @@ int main(void) {
                 console->Draw_canvas(console,ASCII_ANCHOR_BOTTOM_LEFT, 1, console->height - 1, console->width - 2, ground->height, ground);
                 if(clouds_move){ clouds->Shift(clouds,1,0); clouds_move = 0; }
                 console->Draw_canvas(console,ASCII_ANCHOR_TOP_LEFT,1,1,console->width - 2, clouds->height, clouds);
-
+                
                 // dinosaur
                 if(walk_move){ if(sprite_select == 1){ sprite_select = 2; }else{ sprite_select = 1; } walk_move = 0;} 
-                console->Draw_sprite(console,ASCII_ANCHOR_BOTTOM_LEFT,3,console->height - ground->height,rex_sprite[sprite_select]);
+                
+                if(jump_flag){ in_air_flag = 1; jump_flag = 0; t2 = t2_min; }
+
+                if(in_air_flag){
+                    pos_y = jump_function(t2,max_height,jump_timer);
+                    if(jump_timer > t2/2 && pos_y == 0){ in_air_flag = 0; jump_timer = 0; jump_flag = 0; } 
+
+                    if(pos_y >= 1){
+                        rex_sprite[0]->Array_recolour(rex_sprite, ASCII_ANCHOR_TOP_LEFT, 0, rex_sprite[0]->height - 1, rex_sprite[0]->width, 1, ASCII_LAYER_FOREGROUND | ASCII_LAYER_BACKGROUND, palette->sky_color);
+                        console->Draw_sprite(console,ASCII_ANCHOR_BOTTOM_LEFT,3,console->height - ground->height - pos_y,rex_sprite[0]);
+                    }
+                    else{
+                        rex_sprite[0]->Array_recolour(rex_sprite, ASCII_ANCHOR_TOP_LEFT, 0, rex_sprite[0]->height - 1, rex_sprite[0]->width, 1, ASCII_LAYER_FOREGROUND | ASCII_LAYER_BACKGROUND, palette->ground_back_color);
+                        console->Draw_sprite(console,ASCII_ANCHOR_BOTTOM_LEFT,3,console->height - ground->height - pos_y,rex_sprite[sprite_select]);
+                    }
+                }
+                else{
+                    rex_sprite[0]->Array_recolour(rex_sprite, ASCII_ANCHOR_TOP_LEFT, 0, rex_sprite[0]->height - 1, rex_sprite[0]->width, 1, ASCII_LAYER_FOREGROUND | ASCII_LAYER_BACKGROUND, palette->ground_back_color);
+                    console->Draw_sprite(console,ASCII_ANCHOR_BOTTOM_LEFT,3,console->height - ground->height,rex_sprite[sprite_select]);
+                }
+
+                // cacti
+                
+                
+
+                // score
+                console->Draw_frame(console,console->width - 2, 1, console->width - 2 - strlen(score_msg) - 10 - 2 + 1, 1 + 2, ASCII_FRAME_CHARSET_THICK, palette->border_color);
+                sprintf(score_buffer,"%s%010u",score_msg,score);
+                console->Put_string(console,console->width - 3 - strlen(score_msg) - 10 + 1, 2, strlen(score_msg) + 10, score_buffer, palette->sky_color | palette->text_color);
+
                 break;
 
             default:
@@ -217,3 +293,21 @@ ascii_sprite **sprites_load(const char *name, unsigned int quantity, unsigned in
 void play_sound(SOUND_Typedef sound){
     PlaySoundA(sounds_tag_array[sound], GetModuleHandle(NULL), SND_RESOURCE);
 }
+
+void play_sound_async(SOUND_Typedef sound){
+    PlaySoundA(sounds_tag_array[sound], GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+}
+
+int jump_function(float t2, int h, float t){
+    float a = -(4.0*h)/pow(t2,2);
+    float pos_y = a*(t-0)*(t-t2);
+
+    if(pos_y <= 0.0)
+        return 0;
+    else
+        return (int) pos_y; 
+} 
+
+int random_range(int a, int b){
+    return (rand() % (((a < b) ? b : a) - ((a < b) ? a : b))) + ((a < b) ? a : b);
+} 
