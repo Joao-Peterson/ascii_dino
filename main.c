@@ -8,6 +8,10 @@
 
 #include "ascii_screen.h"
 #include "win_res.h"
+#include "sprite_treadmill.h"
+
+#define SCREEN_WIDTH  77
+#define SCREEN_HEIGHT 17
 
 /* ------------------------- Typedef's - Enum's - Structs -------------------------- */
 
@@ -47,7 +51,7 @@ const COLOR_PALETTE palette_normal = {
     .logo_color =         ASCII_COLOR_FOREGROUND_BLACK,
     .text_color =         ASCII_COLOR_FOREGROUND_BLACK,
     .cloud_color =        ASCII_COLOR_BACKGROUND_BLUE | ASCII_COLOR_BACKGROUND_INTENSITY | ASCII_COLOR_FOREGROUND_WHITE,
-    .cacti_color =        ASCII_COLOR_BACKGROUND_BLUE | ASCII_COLOR_BACKGROUND_INTENSITY | ASCII_COLOR_FOREGROUND_GREEN,
+    .cacti_color =        ASCII_COLOR_FOREGROUND_GREEN,
     .dino_color =         ASCII_COLOR_BACKGROUND_BLUE | ASCII_COLOR_BACKGROUND_INTENSITY | ASCII_COLOR_FOREGROUND_BLACK,
     .ptero_color =        ASCII_COLOR_BACKGROUND_BLUE | ASCII_COLOR_BACKGROUND_INTENSITY | ASCII_COLOR_FOREGROUND_BLACK
 };
@@ -72,8 +76,6 @@ void play_sound(SOUND_Typedef sound);
 void play_sound_async(SOUND_Typedef sound);
 
 int jump_function(float t2, int h, float t);
-
-int random_range(int a, int b);
 
 /* ------------------------- Main -------------------------------------------------- */
 
@@ -112,23 +114,22 @@ int main(void) {
     int max_height = 8;
     int pos_y = 0;
 
-    const float cacti_delay = 2000.0;
-
-    
     int sprite_select = 0;
     unsigned int current_screen = 0;
     char keyboard_input;
 
     const char *msg_main_screen = "Press space to Start - Game by Peterson - 2020.";
 
-    ascii_screen *console = ascii_screen_new(77, 17);
+    ascii_screen *console = ascii_screen_new(SCREEN_WIDTH, SCREEN_HEIGHT);
 
     COLOR_PALETTE *palette = (COLOR_PALETTE*)&palette_normal;  
 
     ascii_sprite **rex_sprite   = sprites_load("rex",4,9,6,true,palette->sky_color, palette->dino_color);    
-    ascii_sprite **cacti_sprite = sprites_load("cacti",4,15,false,4,palette->sky_color, palette->cacti_color);    
+    ascii_sprite **cacti_sprite = sprites_load("cacti",4,15,4,true,palette->sky_color, palette->cacti_color | palette->sky_color);    
     ascii_sprite **logo_sprite  = sprites_load("logo",1,69,9,true,palette->menu_color,palette->logo_color | palette->menu_color);
     
+    cacti_sprite[0]->Array_recolour(cacti_sprite, ASCII_ANCHOR_TOP_LEFT, 0, cacti_sprite[0]->height - 1, cacti_sprite[0]->width, 1, ASCII_LAYER_BACKGROUND | ASCII_LAYER_FOREGROUND, palette->ground_back_color | palette->cacti_color);
+
     char *ground_ascii = get_win_resource_binary_data("ground0");
     ascii_canvas *ground = ascii_canvas_new(100,3,ground_ascii, false, palette->ground_fore_color | palette->ground_back_color, palette->ground_fore_color | palette->ground_back_color);
     free(ground_ascii);
@@ -196,6 +197,7 @@ int main(void) {
                 break;
         }
 
+
         // GAME LOGIC
         switch(current_screen){
             case 0: // -------------- Main screen
@@ -206,8 +208,16 @@ int main(void) {
                 break;
             
             case 1: // -------------- Running screen
+
+                // border 
                 console->Draw_box(console,0,0,console->width - 1,console->height - 1,ASCII_LAYER_BACKGROUND | ASCII_LAYER_FOREGROUND, ASCII_BRUSH_ARRAY[2], palette->border_color, ' ', palette->sky_color);
-                if(ground_move){ ground->Shift(ground,1,0); ground_move = 0; }
+                if(ground_move){ 
+                    ground->Shift(ground,1,0); 
+                    ground_move = 0; 
+                    // cacti_array->Shift(cacti_array); 
+                }
+
+                // clouds
                 console->Draw_canvas(console,ASCII_ANCHOR_BOTTOM_LEFT, 1, console->height - 1, console->width - 2, ground->height, ground);
                 if(clouds_move){ clouds->Shift(clouds,1,0); clouds_move = 0; }
                 console->Draw_canvas(console,ASCII_ANCHOR_TOP_LEFT,1,1,console->width - 2, clouds->height, clouds);
@@ -236,8 +246,12 @@ int main(void) {
                 }
 
                 // cacti
-                
-                
+
+                // for(int i = 0; i <= cacti_array->window_max; i++){
+                //     if(cacti_array->array[i] != -1)
+                //         console->Draw_sprite(console,ASCII_ANCHOR_BOTTOM_LEFT, i - cacti_array->sprite_width, console->height - ground->height, cacti_sprite[cacti_array->array[i]]);
+                // }
+
 
                 // score
                 console->Draw_frame(console,console->width - 2, 1, console->width - 2 - strlen(score_msg) - 10 - 2 + 1, 1 + 2, ASCII_FRAME_CHARSET_THICK, palette->border_color);
@@ -306,8 +320,4 @@ int jump_function(float t2, int h, float t){
         return 0;
     else
         return (int) pos_y; 
-} 
-
-int random_range(int a, int b){
-    return (rand() % (((a < b) ? b : a) - ((a < b) ? a : b))) + ((a < b) ? a : b);
 } 

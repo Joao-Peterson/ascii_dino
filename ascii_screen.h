@@ -1,3 +1,6 @@
+#ifndef _ASCII_SCREEN_
+#define _ASCII_SCREEN_
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -765,3 +768,6 @@ void ascii_canvas_shift(ascii_canvas *canvas, int x, int y){
 }
 
 // ASCII CANVAS DELETE
+
+
+#endif
